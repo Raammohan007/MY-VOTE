@@ -2,69 +2,49 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## Available Scripts
+## 🗳️ Class Election Voting System
 
-In the project directory, you can run:
+A comprehensive, modern voting application designed for tuition centers to conduct fair and transparent elections for class positions.
 
-### `npm start`
+### Features
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+**Multi-Grade Voting Structure**
+- Grades 6-10: Vote for Boy & Girl Class Representatives
+- Grade 11: Vote for Assistant Tuition Leader & Coordinators (Science & Commerce groups)
+- Grade 12: Vote for Overall Incharge & 4 Coordinators
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+**Role-Based Access**
+- Students: Vote only for their own grade/group
+- Teachers: Vote for all grades and roles
+- Admin: Manage candidates and view results (PIN: 1234)
 
-### `npm test`
+**Admin Features**
+- Manage candidate names, symbols, photos
+- Real-time dashboard with pie charts
+- Vote rankings and analytics
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Quick Start
 
-### `npm run build`
+```bash
+cd voting-system
+npm install
+npm start
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Open [http://localhost:3000](http://localhost:3000)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### How to Use
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+**Students**: Click Student → Enter name/grade → Select grade candidates → Submit
 
-### `npm run eject`
+**Teachers**: Click Teacher → Can vote for all grades → Select positions → Submit
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+**Admin**: Click Admin → Enter PIN (1234) → Manage candidates or view results
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Data Persistence
+- Saves data to localStorage automatically
+- Teachers can vote for all grades
+- Students restricted to their own grade
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+For more details, see the application's built in documentation.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)

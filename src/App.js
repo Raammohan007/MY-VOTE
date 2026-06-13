@@ -1,23 +1,346 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import "./App.css";
+import "./styles/components.css";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Tooltip,
+  Legend
+} from "chart.js";
+import Home from "./components/Home";
+import StudentLogin from "./components/StudentLogin";
+import StudentVote from "./components/StudentVote";
+import AdminLogin from "./components/AdminLogin";
+import AdminPanel from "./components/AdminPanel";
+import AdminDashboard from "./components/AdminDashboard";
+import { initializeCandidates, normalizeCandidates } from "./utils/votingData";
+import { db } from "./firebase";
+import { doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
+
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 function App() {
+  const [screen, setScreen] = useState("home");
+  const [userType, setUserType] = useState(null); // 'student', 'teacher', null
+  const [user, setUser] = useState(null);
+  const [candidates, setCandidates] = useState(() => initializeCandidates());
+  const [votes, setVotes] = useState([]);
+  const [adminName, setAdminName] = useState(null);
+  const [deviceId, setDeviceId] = useState(null);
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    let existingDeviceId = localStorage.getItem('voterDeviceId');
+    if (!existingDeviceId) {
+      existingDeviceId = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      localStorage.setItem('voterDeviceId', existingDeviceId);
+    }
+    setDeviceId(existingDeviceId);
+  }, []);
+
+  // Load data from Firestore on mount
+  useEffect(() => {
+    const initializeData = async () => {
+      // Initialize candidates if not exists
+      const candidatesRef = doc(db, 'voting', 'candidates');
+      const candidatesSnap = await getDoc(candidatesRef);
+      if (!candidatesSnap.exists()) {
+        await setDoc(candidatesRef, { candidates: initializeCandidates() });
+      }
+
+      // Initialize votes if not exists
+      const votesRef = doc(db, 'voting', 'votes');
+      const votesSnap = await getDoc(votesRef);
+      if (!votesSnap.exists()) {
+        await setDoc(votesRef, { votes: [] });
+      }
+
+      const sessionRef = doc(db, 'voting', 'session');
+      const sessionSnap = await getDoc(sessionRef);
+      if (!sessionSnap.exists()) {
+        await setDoc(sessionRef, { status: 'idle' });
+      }
+    };
+
+    initializeData();
+
+    // Listen for candidates updates
+    const candidatesRef = doc(db, 'voting', 'candidates');
+    const unsubscribeCandidates = onSnapshot(candidatesRef, (docSnap) => {
+      if (docSnap.exists()) {
+        try {
+          setCandidates(normalizeCandidates(docSnap.data().candidates));
+        } catch (e) {
+          console.error('Error loading candidates:', e);
+        }
+      }
+    });
+
+    // Listen for votes updates
+    const votesRef = doc(db, 'voting', 'votes');
+    const unsubscribeVotes = onSnapshot(votesRef, (docSnap) => {
+      if (docSnap.exists()) {
+        try {
+          setVotes(docSnap.data().votes || []);
+        } catch (e) {
+          console.error('Error loading votes:', e);
+        }
+      }
+    });
+
+    const sessionRef = doc(db, 'voting', 'session');
+    const unsubscribeSession = onSnapshot(sessionRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setSession(docSnap.data());
+      } else {
+        setSession(null);
+      }
+    });
+
+    return () => {
+      unsubscribeCandidates();
+      unsubscribeVotes();
+      unsubscribeSession();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (session?.status === 'voting' && session.activeUser) {
+      setUser(session.activeUser);
+      setUserType(session.activeUser.type);
+      setScreen('voting');
+      return;
+    }
+
+    if (screen === 'voting' && user) {
+      return;
+    }
+
+    if (screen !== 'login' && screen !== 'adminLogin' && screen !== 'adminPanel' && screen !== 'adminDashboard') {
+      setUser(null);
+      setUserType(null);
+      setScreen('home');
+    }
+  }, [session, screen, user]);
+
+  const handleStartVoting = (type) => {
+    if (session?.status === 'voting') {
+      setScreen('voting');
+      return;
+    }
+
+    setUserType(type);
+    setScreen("login");
+  };
+
+  const getVoterKey = (userData) => {
+    const parts = [
+      userData.type,
+      userData.voterId || userData.name,
+      userData.grade || "teacher",
+      userData.group || "none"
+    ];
+    return parts.map((part) => String(part).trim().toLowerCase()).join("|");
+  };
+
+  const handleLoginSuccess = async (userData) => {
+    const voterKey = getVoterKey(userData);
+    const alreadyVoted = votes.some((vote) => vote.voterKey === voterKey);
+
+    if (alreadyVoted) {
+      alert("This voter has already voted. Please activate the next voter.");
+      return;
+    }
+
+    const activeUser = { ...userData, voterKey };
+    setUser(activeUser);
+    setUserType(userData.type);
+    setScreen("voting");
+
+    try {
+      await setDoc(doc(db, 'voting', 'session'), {
+        status: 'voting',
+        activeUser,
+        ownerDeviceId: deviceId,
+        startedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error activating ballot session:', error);
+    }
+  };
+
+  const handleVote = async (voteData) => {
+    const voteItems = Array.isArray(voteData) ? voteData : [voteData];
+    const newVotes = [...votes, ...voteItems];
+    setVotes(newVotes);
+    // Save to Firestore
+    try {
+      await setDoc(doc(db, 'voting', 'votes'), { votes: newVotes });
+      await setDoc(doc(db, 'voting', 'session'), {
+        status: 'idle'
+      });
+    } catch (error) {
+      console.error('Error saving vote:', error);
+    }
+  };
+
+  const handleAdminClick = () => {
+    setScreen("adminLogin");
+  };
+
+  const handleAdminLoginSuccess = (name) => {
+    setAdminName(name);
+    setScreen("adminPanel");
+  };
+
+  const handleUpdateCandidates = async (newCandidates) => {
+    setCandidates(newCandidates);
+    // Save to Firestore
+    try {
+      await setDoc(doc(db, 'voting', 'candidates'), { candidates: newCandidates });
+    } catch (error) {
+      console.error('Error saving candidates:', error);
+    }
+  };
+
+  const handleLogout = () => {
+    setAdminName(null);
+    setScreen("home");
+  };
+
+  const handleResetElection = async () => {
+    const confirmed = window.confirm(
+      'Reset all voters now? This clears every saved vote and unlocks voters so they can vote again.'
+    );
+
+    if (!confirmed) {
+      return false;
+    }
+
+    try {
+      const emptyVotes = [];
+      setVotes(emptyVotes);
+      await setDoc(doc(db, 'voting', 'votes'), { votes: emptyVotes });
+      await setDoc(doc(db, 'voting', 'session'), { status: 'idle' });
+      setSession({ status: 'idle' });
+      setUser(null);
+      setUserType(null);
+      alert('All voters reset: saved votes cleared and voting is ready again.');
+      return true;
+    } catch (error) {
+      console.error('Error resetting election:', error);
+      alert('Failed to reset voters. Check console for details.');
+      return false;
+    }
+  };
+
+  const handleBackToAdmin = () => {
+    setScreen("adminPanel");
+  };
+
+  const handleGoToDashboard = () => {
+    setScreen("adminDashboard");
+  };
+
+  const handleBackHome = async () => {
+    if (session?.activeUser?.voterKey === user?.voterKey) {
+      try {
+        await setDoc(doc(db, 'voting', 'session'), { status: 'idle' });
+      } catch (error) {
+        console.error('Error clearing ballot session:', error);
+      }
+    }
+
+    setUser(null);
+    setUserType(null);
+    setScreen("home");
+  };
+
+  const handleClearActiveSession = async () => {
+    try {
+      await setDoc(doc(db, 'voting', 'session'), { status: 'idle' });
+      setSession({ status: 'idle' });
+      setUser(null);
+      setUserType(null);
+      setScreen('home');
+    } catch (error) {
+      console.error('Error clearing active session:', error);
+      alert('Could not clear active session. Please try from Admin Panel.');
+    }
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="app-wrapper">
+      {/* HOME SCREEN */}
+      {screen === "home" && (
+        <Home
+          sessionActive={session?.status === 'voting'}
+          sessionUser={session?.activeUser}
+          onOpenBallot={() => setScreen('voting')}
+          onStartVoting={handleStartVoting}
+          onClearActiveSession={handleClearActiveSession}
+          onAdminClick={handleAdminClick}
+        />
+      )}
+
+      {/* STUDENT/TEACHER LOGIN */}
+      {screen === "login" && (
+        <StudentLogin 
+          userType={userType}
+          onLoginSuccess={handleLoginSuccess}
+          onBack={handleBackHome}
+        />
+      )}
+
+      {/* VOTING SCREEN */}
+      {screen === "voting" && user && (
+        <StudentVote 
+          candidates={candidates}
+          studentGrade={user.grade}
+          studentGroup={user.group}
+          studentName={user.name}
+          voterId={user.voterId}
+          voterKey={user.voterKey}
+          onVote={handleVote}
+          onBack={handleBackHome}
+          canVoteForAll={userType === 'teacher'}
+          showBackButton={true}
+        />
+      )}
+
+      {/* ADMIN LOGIN */}
+      {screen === "adminLogin" && (
+        <AdminLogin 
+          onAdminSuccess={handleAdminLoginSuccess}
+          onBack={handleBackHome}
+          correctPin="1234"
+        />
+      )}
+
+      {/* ADMIN PANEL */}
+      {screen === "adminPanel" && adminName && (
+        <AdminPanel 
+          candidates={candidates}
+          onUpdateCandidates={handleUpdateCandidates}
+          onGoToDashboard={handleGoToDashboard}
+          onResetElection={handleResetElection}
+          onLogout={handleLogout}
+          onBack={() => setScreen('adminLogin')}
+        />
+      )}
+
+      {/* ADMIN DASHBOARD */}
+      {screen === "adminDashboard" && adminName && (
+        <AdminDashboard 
+          candidates={candidates}
+          votes={votes}
+          onBack={handleBackToAdmin}
+          onResetElection={handleResetElection}
+        />
+      )}
     </div>
   );
 }

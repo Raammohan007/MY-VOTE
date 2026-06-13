@@ -7,15 +7,20 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
+    "chart.js": "^4.5.1",
+    "firebase": "^12.12.1",
+    "firebase-admin": "^13.10.0",
     "react": "^19.2.5",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.5",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^5.0.1",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "reset:voting": "node scripts/resetVotingData.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
