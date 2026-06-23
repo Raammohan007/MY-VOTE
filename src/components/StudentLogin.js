@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { getGradeLabel, GROUPS, hasGroups, VOTER_GRADES } from '../utils/votingData';
+import { getGradeLabel, VOTER_GRADES } from '../utils/votingData';
 import '../styles/components.css';
 
-function StudentLogin({ onLoginSuccess, onBack, userType = 'student', showBackButton = true }) {
+function StudentLogin({ onLoginSuccess, onBack, userType = 'student', showBackButton = true, savedVoterEntry, onSaveQuickVoter, onClearQuickVoter }) {
   const [name, setName] = useState('');
   const [voterId, setVoterId] = useState('');
   const [grade, setGrade] = useState('Primary');
-  const [group, setGroup] = useState('');
   const [error, setError] = useState('');
+  const [quickMessage, setQuickMessage] = useState('');
 
   const isTeacher = userType === 'teacher';
-  const showGroup = !isTeacher && hasGroups(grade);
 
   const handleLogin = () => {
     if (!name.trim()) {
@@ -23,19 +22,50 @@ function StudentLogin({ onLoginSuccess, onBack, userType = 'student', showBackBu
       return;
     }
 
-    if (showGroup && !group) {
-      setError('Please select your group');
-      return;
-    }
-
     setError('');
     onLoginSuccess({
       name: name.trim(),
       voterId: voterId.trim(),
       grade: isTeacher ? null : grade,
-      group: showGroup ? group : null,
+      group: null,
       type: userType
     });
+  };
+
+  const handleUseQuickVoter = () => {
+    if (!savedVoterEntry) return;
+
+    const quickUser = {
+      ...savedVoterEntry,
+      type: savedVoterEntry.type || userType,
+      group: null
+    };
+
+    setName(quickUser.name || '');
+    setVoterId(quickUser.voterId || '');
+    setGrade(quickUser.grade || 'Primary');
+    setError('');
+    onLoginSuccess(quickUser);
+  };
+
+  const handleSaveQuickEntry = () => {
+    if (!name.trim() || !voterId.trim()) {
+      setError('Enter name and ID first to save a quick voter.');
+      return;
+    }
+
+    if (!onSaveQuickVoter) return;
+
+    onSaveQuickVoter({
+      name: name.trim(),
+      voterId: voterId.trim(),
+      grade: isTeacher ? null : grade,
+      group: null,
+      type: userType
+    });
+
+    setQuickMessage('Quick voter entry saved for faster check-in.');
+    setTimeout(() => setQuickMessage(''), 3000);
   };
 
   const handleKeyDown = (event) => {
@@ -93,7 +123,6 @@ function StudentLogin({ onLoginSuccess, onBack, userType = 'student', showBackBu
                 value={grade}
                 onChange={(event) => {
                   setGrade(event.target.value);
-                  setGroup('');
                 }}
                 className="form-input"
               >
@@ -104,28 +133,45 @@ function StudentLogin({ onLoginSuccess, onBack, userType = 'student', showBackBu
             </div>
           )}
 
-          {showGroup && (
-            <div className="form-group">
-              <label>Group *</label>
-              <select
-                value={group}
-                onChange={(event) => setGroup(event.target.value)}
-                className="form-input"
-              >
-                <option value="">Select your group</option>
-                {GROUPS.map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {error && <div className="error-message">{error}</div>}
+          {quickMessage && <div className="success-message">{quickMessage}</div>}
+
+          <div className="quick-voter-row">
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={handleSaveQuickEntry}
+              disabled={!name.trim() || !voterId.trim()}
+            >
+              Save Quick Voter
+            </button>
+            <button
+              type="button"
+              className="start-btn"
+              onClick={handleUseQuickVoter}
+              disabled={!savedVoterEntry}
+            >
+              Use Saved Voter
+            </button>
+            <button
+              type="button"
+              className="danger-btn"
+              onClick={() => {
+                onClearQuickVoter();
+                setQuickMessage('Saved quick voter entry cleared.');
+                setTimeout(() => setQuickMessage(''), 3000);
+              }}
+              disabled={!savedVoterEntry}
+            >
+              Clear Saved Voter
+            </button>
+          </div>
 
           <button
             className="login-btn"
             onClick={handleLogin}
-            disabled={!name.trim() || !voterId.trim() || (showGroup && !group)}
+            disabled={!name.trim() || !voterId.trim()}
           >
             Activate EVM Ballot
           </button>

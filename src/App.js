@@ -18,7 +18,7 @@ import AdminPanel from "./components/AdminPanel";
 import AdminDashboard from "./components/AdminDashboard";
 import { initializeCandidates, normalizeCandidates } from "./utils/votingData";
 import { db } from "./firebase";
-import { doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, getDoc, onSnapshot, runTransaction } from "firebase/firestore";
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -31,8 +31,18 @@ function App() {
   const [adminName, setAdminName] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [session, setSession] = useState(null);
+  const [savedVoterEntry, setSavedVoterEntry] = useState(null);
 
   useEffect(() => {
+    const quickEntry = localStorage.getItem('quickVoterEntry');
+    if (quickEntry) {
+      try {
+        setSavedVoterEntry(JSON.parse(quickEntry));
+      } catch (err) {
+        console.error('Invalid quick voter data:', err);
+      }
+    }
+
     let existingDeviceId = localStorage.getItem('voterDeviceId');
     if (!existingDeviceId) {
       existingDeviceId = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -146,6 +156,17 @@ function App() {
     return parts.map((part) => String(part).trim().toLowerCase()).join("|");
   };
 
+  const handleSaveQuickVoter = (voterData) => {
+    localStorage.setItem('quickVoterEntry', JSON.stringify(voterData));
+    setSavedVoterEntry(voterData);
+    alert('Quick voter entry saved. Use this to activate voters faster next time.');
+  };
+
+  const handleClearQuickVoter = () => {
+    localStorage.removeItem('quickVoterEntry');
+    setSavedVoterEntry(null);
+  };
+
   const handleLoginSuccess = async (userData) => {
     const voterKey = getVoterKey(userData);
     const alreadyVoted = votes.some((vote) => vote.voterKey === voterKey);
@@ -174,16 +195,41 @@ function App() {
 
   const handleVote = async (voteData) => {
     const voteItems = Array.isArray(voteData) ? voteData : [voteData];
-    const newVotes = [...votes, ...voteItems];
-    setVotes(newVotes);
-    // Save to Firestore
+    const voterKey = voteItems[0]?.voterKey;
+
+    if (!voterKey) {
+      alert('Vote could not be saved. Missing voter identity.');
+      return false;
+    }
+
     try {
-      await setDoc(doc(db, 'voting', 'votes'), { votes: newVotes });
+      const votesRef = doc(db, 'voting', 'votes');
+      const newVotes = await runTransaction(db, async (transaction) => {
+        const votesSnap = await transaction.get(votesRef);
+        const existingVotes = votesSnap.exists() ? votesSnap.data().votes || [] : [];
+
+        if (existingVotes.some((vote) => vote.voterKey === voterKey)) {
+          throw new Error('VOTER_ALREADY_VOTED');
+        }
+
+        const nextVotes = [...existingVotes, ...voteItems];
+        transaction.set(votesRef, { votes: nextVotes });
+        return nextVotes;
+      });
+
+      setVotes(newVotes);
       await setDoc(doc(db, 'voting', 'session'), {
         status: 'idle'
       });
+      return true;
     } catch (error) {
       console.error('Error saving vote:', error);
+      if (error.message === 'VOTER_ALREADY_VOTED') {
+        alert('This voter has already voted. Vote was not changed.');
+      } else {
+        alert('Vote could not be saved. Please ask the polling officer to try again.');
+      }
+      return false;
     }
   };
 
@@ -291,6 +337,9 @@ function App() {
         <StudentLogin 
           userType={userType}
           onLoginSuccess={handleLoginSuccess}
+          onSaveQuickVoter={handleSaveQuickVoter}
+          onClearQuickVoter={handleClearQuickVoter}
+          savedVoterEntry={savedVoterEntry}
           onBack={handleBackHome}
         />
       )}

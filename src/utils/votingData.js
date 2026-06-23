@@ -15,32 +15,18 @@ export const getRolesForGrade = (grade) => {
   if (gradeNumber === 9 || gradeNumber === 10) {
     return [
       {
-        id: 'boyCoordinator',
-        label: 'Boy Student Coordinator',
-        shortLabel: 'Boy Coordinator',
+        id: 'studentCoordinators',
+        label: 'Student Coordinators (Top 3)',
+        shortLabel: 'Coordinators',
         scope: ROLE_SCOPES.CLASS,
-        seats: 1
+        seats: 3
       },
       {
-        id: 'girlCoordinator',
-        label: 'Girl Student Coordinator',
-        shortLabel: 'Girl Coordinator',
+        id: 'studentVolunteers',
+        label: 'Student Volunteers (Top 3)',
+        shortLabel: 'Volunteers',
         scope: ROLE_SCOPES.CLASS,
-        seats: 1
-      },
-      {
-        id: 'boyVolunteer',
-        label: 'Boy Volunteer',
-        shortLabel: 'Boy Volunteer',
-        scope: ROLE_SCOPES.CLASS,
-        seats: 1
-      },
-      {
-        id: 'girlVolunteer',
-        label: 'Girl Volunteer',
-        shortLabel: 'Girl Volunteer',
-        scope: ROLE_SCOPES.CLASS,
-        seats: 1
+        seats: 3
       }
     ];
   }
@@ -49,24 +35,24 @@ export const getRolesForGrade = (grade) => {
     return [
       {
         id: 'studentCoordinator',
-        label: 'Student Coordinator',
-        shortLabel: 'Coordinator',
-        scope: ROLE_SCOPES.GROUP,
-        seats: 1
+        label: 'Student Coordinators (Top 3)',
+        shortLabel: 'Coordinators',
+        scope: ROLE_SCOPES.CLASS,
+        seats: 3
       },
       {
         id: 'volunteer',
-        label: 'Volunteer',
-        shortLabel: 'Volunteer',
-        scope: ROLE_SCOPES.GROUP,
-        seats: 1
+        label: 'Volunteers (Top 3)',
+        shortLabel: 'Volunteers',
+        scope: ROLE_SCOPES.CLASS,
+        seats: 3
       },
       {
         id: 'eventCoordinator',
-        label: 'Event Coordinator',
-        shortLabel: 'Event Coordinator',
-        scope: ROLE_SCOPES.GROUP,
-        seats: 1
+        label: 'Event Coordinators (Top 3)',
+        shortLabel: 'Event Coordinators',
+        scope: ROLE_SCOPES.CLASS,
+        seats: 3
       },
       {
         id: 'assistantTuitionLeader',
@@ -89,24 +75,24 @@ export const getRolesForGrade = (grade) => {
     return [
       {
         id: 'studentCoordinator',
-        label: 'Student Coordinator',
-        shortLabel: 'Coordinator',
-        scope: ROLE_SCOPES.GROUP,
-        seats: 1
+        label: 'Student Coordinators (Top 3)',
+        shortLabel: 'Coordinators',
+        scope: ROLE_SCOPES.CLASS,
+        seats: 3
       },
       {
         id: 'volunteer',
-        label: 'Volunteer',
-        shortLabel: 'Volunteer',
-        scope: ROLE_SCOPES.GROUP,
-        seats: 1
+        label: 'Volunteers (Top 3)',
+        shortLabel: 'Volunteers',
+        scope: ROLE_SCOPES.CLASS,
+        seats: 3
       },
       {
         id: 'eventCoordinator',
-        label: 'Event Coordinator',
-        shortLabel: 'Event Coordinator',
-        scope: ROLE_SCOPES.GROUP,
-        seats: 1
+        label: 'Event Coordinators (Top 3)',
+        shortLabel: 'Event Coordinators',
+        scope: ROLE_SCOPES.CLASS,
+        seats: 3
       },
       {
         id: 'overallIncharge',
@@ -121,7 +107,7 @@ export const getRolesForGrade = (grade) => {
   return [];
 };
 
-export const hasGroups = (grade) => parseInt(grade, 10) >= 11;
+export const hasGroups = (grade) => false;
 
 export const getGradeLabel = (grade) => (grade === 'Primary' ? 'Primary Class' : `Grade ${grade}`);
 
@@ -150,6 +136,24 @@ const makeCandidateSlots = (grade, role, group = null) =>
   Array(Math.max((role.seats || 1) + 2, 3))
     .fill(null)
     .map((_, index) => makeCandidate(grade, role, index, group));
+
+const LEGACY_COMMON_ROLE_IDS = {
+  studentCoordinators: ['boyCoordinator', 'girlCoordinator'],
+  studentVolunteers: ['boyVolunteer', 'girlVolunteer']
+};
+
+const mergeLegacyClassCandidates = (savedCandidates, grade, role) => {
+  const existing = savedCandidates?.[grade]?.[role.id] || [];
+  const legacyCandidates = (LEGACY_COMMON_ROLE_IDS[role.id] || [])
+    .flatMap((legacyRoleId) => savedCandidates?.[grade]?.[legacyRoleId] || [])
+    .filter((candidate) => candidate?.name?.trim());
+
+  const migratedGroupCandidates = GROUPS.flatMap((group) =>
+    (savedCandidates?.[grade]?.[group]?.[role.id] || []).filter((candidate) => candidate?.name?.trim())
+  );
+
+  return [...existing, ...legacyCandidates, ...migratedGroupCandidates];
+};
 
 export const initializeCandidates = () => {
   const candidates = {};
@@ -226,7 +230,7 @@ export const normalizeCandidates = (savedCandidates) => {
         return;
       }
 
-      const existing = savedCandidates?.[grade]?.[role.id] || [];
+      const existing = mergeLegacyClassCandidates(savedCandidates, grade, role);
       merged[grade][role.id] = merged[grade][role.id].map((candidate, index) => ({
         ...candidate,
         ...(existing[index] || {})

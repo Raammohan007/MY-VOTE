@@ -59,6 +59,7 @@ function StudentVote({
   const [selectedVotes, setSelectedVotes] = useState({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const isTeacher = canVoteForAll;
 
@@ -93,6 +94,8 @@ function StudentVote({
   const progress = enrichedItems.length ? Math.round(((currentIndex + 1) / enrichedItems.length) * 100) : 0;
 
   const handleCandidateSelect = (item, candidateId) => {
+    if (submitting || submitted) return;
+
     const maxSelections = item.role.seats || 1;
 
     setSelectedVotes((prev) => {
@@ -106,11 +109,8 @@ function StudentVote({
         };
       }
 
-      if (maxSelections === 1) {
-        return {
-          ...prev,
-          [item.key]: [candidateId]
-        };
+      if (maxSelections === 1 && current.length === 1) {
+        return prev;
       }
 
       if (current.length >= maxSelections) return prev;
@@ -126,12 +126,15 @@ function StudentVote({
     item.needed === 0 || (selectedVotes[item.key] || []).length >= item.needed
   );
 
-  const handleSubmitVotes = () => {
+  const handleSubmitVotes = async () => {
+    if (submitting || submitted) return;
+
     if (!allSelected) {
       alert('Please complete all positions before submitting.');
       return;
     }
 
+    setSubmitting(true);
     const submittedVotes = [];
 
     enrichedItems.forEach((item) => {
@@ -155,7 +158,13 @@ function StudentVote({
       });
     });
 
-    onVote(submittedVotes);
+    const saved = await onVote(submittedVotes);
+
+    if (saved === false) {
+      setSubmitting(false);
+      return;
+    }
+
     setSubmitted(true);
     setTimeout(() => {
       onBack();
@@ -217,6 +226,7 @@ function StudentVote({
                 key={item.key}
                 className={`ballot-step ${index === currentIndex ? 'active' : ''} ${done ? 'done' : ''}`}
                 onClick={() => setCurrentIndex(index)}
+                disabled={submitting}
               >
                 <span>{done ? 'OK' : index + 1}</span>
                 <strong>{item.role.shortLabel || item.role.label}</strong>
@@ -243,6 +253,11 @@ function StudentVote({
               {currentItem.needed > 0 ? `Choose ${currentItem.needed}` : 'No candidates'}
             </span>
           </div>
+          <p className="selection-hint">
+            {currentItem.needed > 1
+              ? `Select up to ${currentItem.needed}. Once full, other options are locked until you unselect one.`
+              : 'Select one candidate. After a choice, other candidates are locked until you undo it.'}
+          </p>
 
           {currentItem.candidatesList.length === 0 ? (
             <div className="empty-ballot-state">
@@ -253,12 +268,15 @@ function StudentVote({
             <div className="modern-candidate-grid">
               {currentItem.candidatesList.map((candidate) => {
                 const selected = selectedForRole.includes(candidate.id);
+                const isLocked = !selected && selectedForRole.length >= currentItem.needed;
 
                 return (
                   <button
                     key={candidate.id}
+                    type="button"
                     className={`modern-candidate-card ${selected ? 'selected' : ''}`}
                     onClick={() => handleCandidateSelect(currentItem, candidate.id)}
+                    disabled={isLocked || submitting}
                   >
                     <div className="modern-candidate-photo">
                       {candidate.photoUrl ? (
@@ -281,11 +299,11 @@ function StudentVote({
 
           <div className="ballot-actions">
             {showBackButton && (
-              <button className="back-btn" onClick={onBack}>Cancel</button>
+              <button className="back-btn" onClick={onBack} disabled={submitting}>Cancel</button>
             )}
             <button
               className="secondary-btn"
-              disabled={currentIndex === 0}
+              disabled={currentIndex === 0 || submitting}
               onClick={() => setCurrentIndex((index) => Math.max(index - 1, 0))}
             >
               Previous
@@ -293,7 +311,7 @@ function StudentVote({
             {currentIndex < enrichedItems.length - 1 ? (
               <button
                 className="start-btn"
-                disabled={!canMoveForward}
+                disabled={!canMoveForward || submitting}
                 onClick={() => setCurrentIndex((index) => Math.min(index + 1, enrichedItems.length - 1))}
               >
                 Next
@@ -301,10 +319,10 @@ function StudentVote({
             ) : (
               <button
                 className="submit-btn"
-                disabled={!allSelected}
+                disabled={!allSelected || submitting}
                 onClick={handleSubmitVotes}
               >
-                Submit Vote
+                {submitting ? 'Submitting...' : 'Submit Vote'}
               </button>
             )}
           </div>

@@ -268,6 +268,18 @@ input:focus, select:focus {
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
+.danger-btn {
+  background: #ef4444;
+  color: white;
+  padding: 14px;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.danger-btn:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
 /* Login Screens */
 .login-container, .admin-login-container {
   width: 100%;
@@ -363,6 +375,21 @@ input:focus, select:focus {
   font-size: 12px;
   color: #999;
   margin-top: 5px;
+}
+
+.quick-voter-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.selection-hint {
+  margin: 16px 0 0;
+  color: #444;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .error-message {
@@ -548,6 +575,94 @@ input:focus, select:focus {
   background: #e8f0ff;
   border-color: #667eea;
   box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
+}
+
+.modern-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.modern-candidate-card {
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 18px;
+  text-align: left;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  transition: transform 0.25s ease, border-color 0.25s ease, opacity 0.25s ease;
+}
+
+.modern-candidate-card:hover:not(:disabled) {
+  transform: translateY(-4px);
+  border-color: #667eea;
+}
+
+.modern-candidate-card.selected {
+  background: #eef2ff;
+  border-color: #4f46e5;
+}
+
+.modern-candidate-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+}
+
+.modern-candidate-photo {
+  width: 100%;
+  min-height: 130px;
+  background: #f8fafc;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.modern-candidate-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modern-candidate-photo span {
+  font-size: 44px;
+  color: #667eea;
+  font-weight: 700;
+}
+
+.modern-candidate-info {
+  display: grid;
+  gap: 4px;
+}
+
+.modern-candidate-info strong {
+  font-size: 16px;
+  color: #1f2937;
+}
+
+.modern-candidate-info span {
+  color: #475569;
+  font-size: 14px;
+}
+
+.modern-candidate-info small {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.select-pill {
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 10px 14px;
+  border-radius: 999px;
+  width: fit-content;
+  align-self: flex-start;
+  font-weight: 600;
+  font-size: 13px;
 }
 
 .candidate-image {
