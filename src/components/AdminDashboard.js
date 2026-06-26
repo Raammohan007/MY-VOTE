@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Bar, Pie } from 'react-chartjs-2';
+import jsPDF from 'jspdf';
 import {
   getCandidatesForRole,
   getGradeLabel,
@@ -153,6 +154,103 @@ function AdminDashboard({ candidates, votes, onBack, onResetElection, showBackBu
 
   const topThree = rankings.slice(0, 3);
 
+  const allRoleSummaries = useMemo(() => {
+    return GRADES.flatMap((grade) => {
+      const rolesForGrade = getRolesForGrade(grade);
+      return rolesForGrade.flatMap((role) => {
+        const groups = role.scope === ROLE_SCOPES.GROUP ? GROUPS : [''];
+
+        return groups.map((group) => {
+          const candidatesForExport = getCandidatesForRole(candidates, grade, role, group).filter((candidate) => candidate.name.trim());
+
+          if (candidatesForExport.length === 0) {
+            return null;
+          }
+
+          const voteCounts = candidatesForExport.reduce((counts, candidate) => {
+            counts[candidate.id] = 0;
+            return counts;
+          }, {});
+
+          votes.forEach((vote) => {
+            if (vote.grade !== grade || vote.role !== role.id) return;
+            if (role.scope === ROLE_SCOPES.GROUP && vote.group !== group) return;
+            if (role.scope === ROLE_SCOPES.TUITION && vote.group) return;
+            if (voteCounts[vote.candidateId] !== undefined) {
+              voteCounts[vote.candidateId] += 1;
+            }
+          });
+
+          const rankedCandidates = candidatesForExport
+            .map((candidate) => ({
+              candidate,
+              votes: voteCounts[candidate.id] || 0
+            }))
+            .sort((a, b) => b.votes - a.votes)
+            .slice(0, 3);
+
+          return {
+            grade,
+            role,
+            group,
+            rankedCandidates
+          };
+        });
+      }).filter(Boolean);
+    });
+  }, [votes, candidates]);
+
+  const downloadResultsPdf = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 40;
+
+    doc.setFontSize(18);
+    doc.text('Election Results Summary', 40, y);
+    y += 20;
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 40, y);
+    y += 24;
+
+    allRoleSummaries.forEach((section, sectionIndex) => {
+      const sectionTitle = `Grade ${section.grade} · ${section.role.label}${section.group ? ` · ${section.group}` : ''}`;
+      doc.setFontSize(13);
+      doc.text(sectionTitle, 40, y);
+      y += 16;
+
+      if (section.rankedCandidates.length === 0) {
+        doc.setFontSize(11);
+        doc.text('No candidates or votes recorded yet.', 48, y);
+        y += 14;
+      } else {
+        section.rankedCandidates.forEach((item, index) => {
+          doc.setFontSize(11);
+          const candidateLine = `${index + 1}. ${item.candidate.symbol ? `${item.candidate.symbol} ` : ''}${item.candidate.name} — ${item.votes} vote${item.votes !== 1 ? 's' : ''}`;
+          doc.text(candidateLine, 48, y, { maxWidth: pageWidth - 96 });
+          y += 14;
+          if (item.candidate.details) {
+            doc.setFontSize(9);
+            doc.text(`Details: ${item.candidate.details}`, 56, y, { maxWidth: pageWidth - 104 });
+            y += 12;
+          }
+        });
+      }
+
+      y += 10;
+      if (y > doc.internal.pageSize.getHeight() - 60) {
+        doc.addPage();
+        y = 40;
+      }
+    });
+
+    if (allRoleSummaries.length === 0) {
+      doc.setFontSize(11);
+      doc.text('No voting data available to export.', 40, y);
+    }
+
+    doc.save('voting-results.pdf');
+  };
+
   const handleGradeChange = (grade) => {
     setSelectedGrade(grade);
     setSelectedGroup(hasGroups(grade) ? 'Science' : '');
@@ -165,6 +263,9 @@ function AdminDashboard({ candidates, votes, onBack, onResetElection, showBackBu
       <div className="dashboard-header">
         <h2>Voting Results Dashboard</h2>
         <div className="dashboard-header-actions">
+          <button className="dashboard-btn" onClick={downloadResultsPdf}>
+            Download Results PDF
+          </button>
           <button className="dashboard-btn" onClick={onResetElection}>
             Reset Election
           </button>

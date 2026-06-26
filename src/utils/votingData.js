@@ -13,7 +13,7 @@ export const getRolesForGrade = (grade) => {
   const gradeNumber = parseInt(grade, 10);
 
   if (gradeNumber === 9 || gradeNumber === 10) {
-    return [
+    const roles = [
       {
         id: 'studentCoordinators',
         label: 'Student Coordinators (Top 3)',
@@ -29,6 +29,18 @@ export const getRolesForGrade = (grade) => {
         seats: 3
       }
     ];
+
+    if (gradeNumber === 10) {
+      roles.push({
+        id: 'eventCoordinator',
+        label: 'Event Coordinators (Top 3)',
+        shortLabel: 'Event Coordinators',
+        scope: ROLE_SCOPES.CLASS,
+        seats: 3
+      });
+    }
+
+    return roles;
   }
 
   if (gradeNumber === 11) {
@@ -65,6 +77,13 @@ export const getRolesForGrade = (grade) => {
         id: 'assistantOverallIncharge',
         label: 'Assistant Overall Incharge',
         shortLabel: 'Assistant Overall',
+        scope: ROLE_SCOPES.TUITION,
+        seats: 1
+      },
+      {
+        id: 'overallIncharge',
+        label: 'Overall Incharge',
+        shortLabel: 'Overall Incharge',
         scope: ROLE_SCOPES.TUITION,
         seats: 1
       }
