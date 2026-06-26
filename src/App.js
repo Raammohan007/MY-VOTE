@@ -169,27 +169,52 @@ function App() {
 
   const handleLoginSuccess = async (userData) => {
     const voterKey = getVoterKey(userData);
-    const alreadyVoted = votes.some((vote) => vote.voterKey === voterKey);
-
-    if (alreadyVoted) {
-      alert("This voter has already voted. Please activate the next voter.");
-      return;
-    }
-
     const activeUser = { ...userData, voterKey };
-    setUser(activeUser);
-    setUserType(userData.type);
-    setScreen("voting");
+    const sessionRef = doc(db, 'voting', 'session');
+    const votesRef = doc(db, 'voting', 'votes');
 
     try {
-      await setDoc(doc(db, 'voting', 'session'), {
-        status: 'voting',
-        activeUser,
-        ownerDeviceId: deviceId,
-        startedAt: new Date().toISOString()
+      await runTransaction(db, async (transaction) => {
+        const [sessionSnap, votesSnap] = await Promise.all([
+          transaction.get(sessionRef),
+          transaction.get(votesRef)
+        ]);
+
+        const existingVotes = votesSnap.exists() ? votesSnap.data().votes || [] : [];
+        const currentSession = sessionSnap.exists() ? sessionSnap.data() : { status: 'idle' };
+
+        if (existingVotes.some((vote) => vote.voterKey === voterKey)) {
+          throw new Error('VOTER_ALREADY_VOTED');
+        }
+
+        if (
+          currentSession.status === 'voting' &&
+          currentSession.activeUser?.voterKey &&
+          currentSession.activeUser.voterKey !== voterKey
+        ) {
+          throw new Error('SESSION_BUSY');
+        }
+
+        transaction.set(sessionRef, {
+          status: 'voting',
+          activeUser,
+          ownerDeviceId: deviceId,
+          startedAt: new Date().toISOString()
+        });
       });
+
+      setUser(activeUser);
+      setUserType(userData.type);
+      setScreen('voting');
     } catch (error) {
       console.error('Error activating ballot session:', error);
+      if (error.message === 'VOTER_ALREADY_VOTED') {
+        alert('This voter has already voted. Please activate the next voter.');
+      } else if (error.message === 'SESSION_BUSY') {
+        alert('Another voter session is already active. Please clear that session before activating a new voter.');
+      } else {
+        alert('Could not activate voter. Please try again.');
+      }
     }
   };
 
@@ -204,28 +229,42 @@ function App() {
 
     try {
       const votesRef = doc(db, 'voting', 'votes');
+      const sessionRef = doc(db, 'voting', 'session');
+
       const newVotes = await runTransaction(db, async (transaction) => {
-        const votesSnap = await transaction.get(votesRef);
+        const [votesSnap, sessionSnap] = await Promise.all([
+          transaction.get(votesRef),
+          transaction.get(sessionRef)
+        ]);
+
         const existingVotes = votesSnap.exists() ? votesSnap.data().votes || [] : [];
+        const currentSession = sessionSnap.exists() ? sessionSnap.data() : { status: 'idle' };
 
         if (existingVotes.some((vote) => vote.voterKey === voterKey)) {
           throw new Error('VOTER_ALREADY_VOTED');
         }
 
+        if (
+          currentSession.status === 'voting' &&
+          currentSession.activeUser?.voterKey !== voterKey
+        ) {
+          throw new Error('SESSION_MISMATCH');
+        }
+
         const nextVotes = [...existingVotes, ...voteItems];
         transaction.set(votesRef, { votes: nextVotes });
+        transaction.set(sessionRef, { status: 'idle' });
         return nextVotes;
       });
 
       setVotes(newVotes);
-      await setDoc(doc(db, 'voting', 'session'), {
-        status: 'idle'
-      });
       return true;
     } catch (error) {
       console.error('Error saving vote:', error);
       if (error.message === 'VOTER_ALREADY_VOTED') {
         alert('This voter has already voted. Vote was not changed.');
+      } else if (error.message === 'SESSION_MISMATCH') {
+        alert('The active session does not match this voter. Please reactivate the voter.');
       } else {
         alert('Vote could not be saved. Please ask the polling officer to try again.');
       }
