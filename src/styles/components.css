@@ -778,6 +778,13 @@ input:focus, select:focus {
   min-width: 300px;
 }
 
+.local-mode-note {
+  margin-top: 6px;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .admin-actions {
   display: flex;
   gap: 12px;

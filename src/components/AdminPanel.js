@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import {
   ALL_SCOPE,
   getCandidatesForRole,
@@ -13,7 +11,18 @@ import {
 } from '../utils/votingData';
 import '../styles/components.css';
 
-function AdminPanel({ candidates, onUpdateCandidates, onGoToDashboard, onResetElection, onLogout, onBack, showBackButton = true }) {
+function AdminPanel({
+  candidates,
+  onUpdateCandidates,
+  onGoToDashboard,
+  onResetElection,
+  onClearActiveVoter,
+  onAllowActiveVoterAgain,
+  onLogout,
+  onBack,
+  showBackButton = true,
+  localMode = false
+}) {
   const [selectedGrade, setSelectedGrade] = useState('9');
   const [selectedGroup, setSelectedGroup] = useState('Science');
   const [editingId, setEditingId] = useState(null);
@@ -158,7 +167,10 @@ function AdminPanel({ candidates, onUpdateCandidates, onGoToDashboard, onResetEl
   return (
     <div className="admin-panel-container">
       <div className="admin-header">
-        <h2>Admin Panel - Manage Election</h2>
+        <div>
+          <h2>Admin Panel - Manage Election</h2>
+          {localMode && <p className="local-mode-note">Local-only mode: changes are saved in this browser.</p>}
+        </div>
         <div className="admin-actions">
           {showBackButton && (
             <button className="back-btn" onClick={onBack}>
@@ -183,15 +195,9 @@ function AdminPanel({ candidates, onUpdateCandidates, onGoToDashboard, onResetEl
           <button
             className="secondary-btn"
             onClick={async () => {
-              try {
-                await setDoc(doc(db, 'voting', 'session'), { status: 'idle' });
-                setSaveMessage('Active voter cleared');
-                setTimeout(() => setSaveMessage(''), 2000);
-              } catch (err) {
-                console.error('Error clearing active voter:', err);
-                setSaveMessage('Failed to clear active voter');
-                setTimeout(() => setSaveMessage(''), 2000);
-              }
+              const result = await onClearActiveVoter();
+              setSaveMessage(result.message);
+              setTimeout(() => setSaveMessage(''), result.ok ? 2000 : 3000);
             }}
           >
             Clear Active Voter
@@ -200,30 +206,9 @@ function AdminPanel({ candidates, onUpdateCandidates, onGoToDashboard, onResetEl
           <button
             className="secondary-btn"
             onClick={async () => {
-              try {
-                const sessionSnap = await getDoc(doc(db, 'voting', 'session'));
-                const votesRef = doc(db, 'voting', 'votes');
-                const votesSnap = await getDoc(votesRef);
-
-                const activeUser = sessionSnap.exists() ? sessionSnap.data().activeUser : null;
-                if (!activeUser || !activeUser.voterKey) {
-                  setSaveMessage('No active voter found');
-                  setTimeout(() => setSaveMessage(''), 2000);
-                  return;
-                }
-
-                const existingVotes = votesSnap.exists() ? votesSnap.data().votes || [] : [];
-                const filtered = existingVotes.filter((v) => v.voterKey !== activeUser.voterKey);
-                await setDoc(votesRef, { votes: filtered });
-                // Also clear session so admin can activate next voter
-                await setDoc(doc(db, 'voting', 'session'), { status: 'idle' });
-                setSaveMessage('Removed voter vote; voter can vote again');
-                setTimeout(() => setSaveMessage(''), 2000);
-              } catch (err) {
-                console.error('Error allowing voter again:', err);
-                setSaveMessage('Failed to allow voter again');
-                setTimeout(() => setSaveMessage(''), 2000);
-              }
+              const result = await onAllowActiveVoterAgain();
+              setSaveMessage(result.message);
+              setTimeout(() => setSaveMessage(''), result.ok ? 2000 : 3000);
             }}
           >
             Allow Voter Again
